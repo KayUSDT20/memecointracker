@@ -1,6 +1,9 @@
 import web3 from '@solana/web3.js';
 import bs58 from 'bs58';
 import { agent } from './agent.js';
+import PumpFun from 'pumpfun-api';
+
+const pumpFun = new PumpFun();
 
 const PUMP_FUN_PROGRAM_ID = new web3.PublicKey('6EF8rrecthR5Dkzon8Nwu78hRvfV9CUZTnzbA1g8Uu6A');
 const connection = new web3.Connection('https://api.mainnet-beta.solana.com', 'confirmed');
@@ -29,50 +32,48 @@ async function fetchTokenMetadata(address) {
 export async function startSolanaListener(broadcast) {
     console.log("Initializing LIVE Solana Listener for pump.fun...");
     
-    // Periodically fetch active tokens to stream real creator actions
+    // Periodically fetch active tokens from pump.fun API to stream real creator actions
     setInterval(async () => {
         try {
-            const res = await fetch(`https://api.dexscreener.com/latest/dex/search/?q=solana`);
-            if (!res.ok) return;
-            const data = await res.json();
-            if (!data.pairs || data.pairs.length === 0) return;
+            const coins = await pumpFun.coins.getCoins({ 
+                limit: 10, 
+                offset: 0, 
+                sort: 'last_trade_timestamp', 
+                order: 'DESC' 
+            });
+            if (!coins || coins.length === 0) return;
 
-            // Pick a random pair from search results
-            const solPairs = data.pairs.filter(p => p.chainId === 'solana');
-            if (solPairs.length === 0) return;
-            const pair = solPairs[Math.floor(Math.random() * solPairs.length)];
-
-            const token = {
-                address: pair.baseToken.address,
-                symbol: pair.baseToken.symbol,
-                name: pair.baseToken.name,
-                marketCap: parseFloat(pair.marketCap || 0),
-                liquidity: `$${parseFloat(pair.liquidity?.usd || 0).toLocaleString()}`,
-                source: 'Pump.fun',
-                timestamp: new Date().toISOString()
+            // Pick a random active coin from the latest list
+            const coin = coins[Math.floor(Math.random() * coins.length)];
+            
+            const creator = {
+                id: coin.creator,
+                name: `Live 0x${coin.creator.substring(0, 4)}`,
+                address: coin.creator,
+                successRate: 'Active',
+                totalTokens: 'Tracking'
             };
 
-            const creatorIndex = Math.floor(Math.random() * 20) + 1;
-            const mockCreator = {
-                id: `creator-${creatorIndex}`,
-                name: `Top Creator ${creatorIndex}`,
-                address: `CreatorWallet${creatorIndex}xyz`,
-                successRate: '92%',
-                totalTokens: Math.floor(Math.random() * 45 + 5)
+            const token = {
+                address: coin.mint,
+                symbol: coin.symbol || `$LIVE_${coin.mint.substring(0, 4).toUpperCase()}`,
+                name: coin.name || `On-Chain Mint ${coin.mint.substring(0, 4)}`,
+                marketCap: parseFloat(coin.usd_market_cap || coin.market_cap || 15000),
+                liquidity: coin.real_sol_reserves ? `$${(coin.real_sol_reserves / 1e9 * 140).toLocaleString()}` : 'TBD',
+                timestamp: new Date(coin.created_timestamp || Date.now()).toISOString(),
+                source: 'Pump.fun',
+                creator: creator
             };
 
             broadcast({
                 type: 'PUMP_CREATOR_TOKEN',
-                data: {
-                    ...token,
-                    creator: mockCreator
-                }
+                data: token
             });
 
             // Send to agent for scanning if not already scanned
             agent.processNewToken(token);
         } catch (e) {
-            console.error("[Solana Heartbeat Error]", e.message);
+            console.error("[PumpFun API Poller Error]", e.message);
         }
     }, 15000); // 15 seconds
 
