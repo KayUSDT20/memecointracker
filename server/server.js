@@ -4,7 +4,7 @@ import { WebSocketServer } from 'ws';
 import cors from 'cors';
 import url from 'url';
 import { startTwitterScraper } from './twitter.js';
-import { startSolanaListener } from './solana.js';
+import { startSolanaListener, pumpFun } from './solana.js';
 import { agent } from './agent.js';
 import { startWhaleWatcher } from './whale.js';
 import { startDexscreenerListener } from './dex.js';
@@ -91,6 +91,41 @@ app.get('/api/scan-token/:address', async (req, res) => {
         res.json(data);
     } catch (e) {
         console.error('Error scanning token:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/pump-metas', async (req, res) => {
+    try {
+        const passcode = req.headers['x-creator-passcode'] || req.query.passcode;
+        const CREATOR_PASSCODE = process.env.CREATOR_PASSCODE || 'TheSunShine110123$$';
+
+        if (passcode !== CREATOR_PASSCODE) {
+            return res.status(401).json({ error: 'Unauthorized access' });
+        }
+
+        console.log(`Authenticated request to fetch pump.fun metas`);
+        try {
+            const coinMetas = await pumpFun.metas.getCurrentMetas();
+            res.json(coinMetas);
+        } catch (apiError) {
+            console.warn("pumpFun.metas.getCurrentMetas failed, falling back to latest active coins:", apiError.message);
+            // Fallback: Query active coins instead
+            const coins = await pumpFun.coins.getCoins({ limit: 10 });
+            res.json(coins.map(c => ({
+                mint: c.mint,
+                name: c.name,
+                symbol: c.symbol,
+                marketCap: c.usd_market_cap || c.market_cap,
+                creator: c.creator,
+                created_timestamp: c.created_timestamp,
+                twitter: c.twitter || null,
+                telegram: c.telegram || null,
+                website: c.website || null
+            })));
+        }
+    } catch (e) {
+        console.error('Error fetching pump metas:', e);
         res.status(500).json({ error: e.message });
     }
 });
