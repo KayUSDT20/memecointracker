@@ -95,6 +95,13 @@ class AIAgent {
         // Avoid duplicate scanning
         if (this.scannedTokens.some(t => t.address === token.address)) return;
 
+        // Calculate initial market cap (if not provided, default to $15k-$35k for pump launches)
+        const initialMc = token.marketCap || Math.floor(Math.random() * 20000) + 15000;
+
+        if (initialMc >= 10000000) {
+            return;
+        }
+
         this.log(`Detected new token: ${token.symbol} (${token.name}) on Solana.`, 'SCANNER');
 
         // Check if there is an X.com tweet matching or if we scan its details
@@ -102,9 +109,6 @@ class AIAgent {
         
         // Analyze relatability of the name
         const { score, reason } = this.analyzeNameRelatability(token.name, token.symbol);
-
-        // Calculate initial market cap (if not provided, default to $15k-$35k for pump launches)
-        const initialMc = token.marketCap || Math.floor(Math.random() * 20000) + 15000;
 
         let status = 'SCANNING';
         if (score >= 70 && tweetContext) {
@@ -339,16 +343,21 @@ class AIAgent {
         this.requestBuy(token);
     }
 
-    // Handles the $70k minimum marketcap buy rule
+    // Handles the $70k minimum marketcap buy rule and $10M maximum marketcap tracker limit
     checkBuyRule(token) {
         // Only buy if status is FLAGGED
         if (token.status !== 'FLAGGED') return;
 
         const MIN_MARKETCAP_BUY = 70000;
-        this.log(`Checking buying conditions for ${token.symbol}. Market Cap: $${token.marketCap.toLocaleString()} vs Min: $${MIN_MARKETCAP_BUY.toLocaleString()}`, 'DECISION');
+        const MAX_MARKETCAP_BUY = 10000000;
+        this.log(`Checking buying conditions for ${token.symbol}. Market Cap: $${token.marketCap.toLocaleString()} vs Range: $${MIN_MARKETCAP_BUY.toLocaleString()} - $${MAX_MARKETCAP_BUY.toLocaleString()}`, 'DECISION');
 
-        if (token.marketCap >= MIN_MARKETCAP_BUY) {
+        if (token.marketCap >= MIN_MARKETCAP_BUY && token.marketCap < MAX_MARKETCAP_BUY) {
             this.requestBuy(token);
+        } else if (token.marketCap >= MAX_MARKETCAP_BUY) {
+            token.status = 'IGNORED';
+            this.log(`Ignored ${token.symbol} for buy request - Market Cap ($${token.marketCap.toLocaleString()}) exceeds the 10M tracking threshold.`, 'DECISION');
+            this.broadcastScannedTokens();
         } else {
             token.status = 'PENDING_MC';
             this.log(`Market cap for ${token.symbol} ($${token.marketCap.toLocaleString()}) is below $70k threshold. Queueing for buy request once target met.`, 'DECISION');
@@ -448,9 +457,12 @@ class AIAgent {
                         token.volume24h = liveData.volume24h || token.volume24h;
                         this.log(`Live Update: ${token.symbol} market cap is $${token.marketCap.toLocaleString()} on ${liveData.dexId}`, 'SCANNER');
 
-                        if (token.marketCap >= 70000) {
+                        if (token.marketCap >= 70000 && token.marketCap < 10000000) {
                             this.log(`Target met! Live token ${token.symbol} reached $${token.marketCap.toLocaleString()} marketcap.`, 'DECISION');
                             this.requestBuy(token);
+                        } else if (token.marketCap >= 10000000) {
+                            token.status = 'IGNORED';
+                            this.log(`Ignored ${token.symbol} - Market Cap ($${token.marketCap.toLocaleString()}) grew beyond 10M limit.`, 'DECISION');
                         }
                     } else {
                         // Drift fallback if it's a simulated mock token
@@ -460,9 +472,12 @@ class AIAgent {
                             token.volume24h = (token.volume24h || 10000) + Math.floor(Math.random() * 5000);
                             this.log(`Monitoring ${token.symbol} (simulated): Market cap grew to $${token.marketCap.toLocaleString()}...`, 'SCANNER');
 
-                            if (token.marketCap >= 70000) {
+                            if (token.marketCap >= 70000 && token.marketCap < 10000000) {
                                 this.log(`Target met! Simulated token ${token.symbol} reached $${token.marketCap.toLocaleString()} marketcap.`, 'DECISION');
                                 this.requestBuy(token);
+                            } else if (token.marketCap >= 10000000) {
+                                token.status = 'IGNORED';
+                                this.log(`Ignored simulated token ${token.symbol} - Market Cap ($${token.marketCap.toLocaleString()}) grew beyond 10M limit.`, 'DECISION');
                             }
                         }
                     }
