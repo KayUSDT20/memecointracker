@@ -1,5 +1,6 @@
 import { targetAccounts } from './accounts.js';
 import * as cheerio from 'cheerio';
+import { agent } from './agent.js';
 
 const MEMECOIN_KEYWORDS = ['pump', 'solana', 'sol', 'memecoin', 'token', 'ca', 'contract', 'launch', 'stealth'];
 
@@ -53,17 +54,22 @@ export async function startTwitterScraper(broadcast) {
                     
                     console.log(`[REAL Signal] @${account}: ${tweetText.substring(0, 50)}...`);
                     
+                    const tweetData = {
+                        id: id || Math.random().toString(36).substring(7),
+                        username: account,
+                        text: tweetText,
+                        timestamp: timestamp || new Date().toISOString(),
+                        ticker: ticker,
+                        isReal: true
+                    };
+
                     broadcast({
                         type: 'TWITTER_SIGNAL',
-                        data: {
-                            id: id || Math.random().toString(36).substring(7),
-                            username: account,
-                            text: tweetText,
-                            timestamp: timestamp || new Date().toISOString(),
-                            ticker: ticker,
-                            isReal: true
-                        }
+                        data: tweetData
                     });
+
+                    // Scan with agent
+                    agent.processXScan(tweetData);
                 }
             });
 
@@ -86,27 +92,32 @@ function isMemecoinSignal(text) {
 }
 
 function fallbackToMock(account, broadcast) {
-    if (Math.random() > 0.7) {
+    if (Math.random() > 0.6) {
         const mockTweets = [
-            "Just found a gem on pump, looks primed. $WIF vibes.",
-            "Solana season is back. Keep an eye on $BONK killers.",
-            "dev looks based, CA: 7v... stealth launch soon.",
-            "this new memecoin is going to billions. $TREMP",
-            "Pump fun going crazy today. found a new one."
+            "Just found a gem on pump, looks primed. CA: ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82 $BOME vibes.",
+            "Solana season is back. Keep an eye on $BONK killers. CA: DezXAZ8z7PnrnMcgzR2wALJ6JvCHgV5vJWM9EZJE2cj",
+            "dev looks based, CA: 7GCihgDB8fe6KNjn2gGZzF4K7B31bN5Z2F7kGwvQ1Q3 stealth launch soon. $POPCAT",
+            "this new memecoin is going to billions. $CHILL CA: 3psH1Mj1f7yUfaD5gh6Zj7epE3hZ1M2dHKw3G3P7E1v2",
+            "Pump fun going crazy today. found a new one. CA: EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm $WIF"
         ];
         const text = mockTweets[Math.floor(Math.random() * mockTweets.length)];
         const extractedTickers = extractTickers(text);
         
+        const tweetData = {
+            id: Math.random().toString(36).substring(7),
+            username: account,
+            text: text,
+            timestamp: new Date().toISOString(),
+            ticker: extractedTickers.length > 0 ? extractedTickers[0] : '$UNKNOWN',
+            isReal: false
+        };
+
         broadcast({
             type: 'TWITTER_SIGNAL',
-            data: {
-                id: Math.random().toString(36).substring(7),
-                username: account,
-                text: text,
-                timestamp: new Date().toISOString(),
-                ticker: extractedTickers.length > 0 ? extractedTickers[0] : '$UNKNOWN',
-                isReal: false
-            }
+            data: tweetData
         });
+
+        // Scan with agent
+        agent.processXScan(tweetData);
     }
 }
