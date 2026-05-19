@@ -62,7 +62,8 @@ const ContractScanner = ({ onForceBuyRequest }) => {
         priceChange6h: bestPair.priceChange?.h6 || 0,
         priceChange24h: bestPair.priceChange?.h24 || 0,
         txns24h: bestPair.txns?.h24 || { buys: 0, sells: 0 },
-        info: bestPair.info || {}
+        info: bestPair.info || {},
+        holders: data.holders || []
       };
 
       setTokenData(formatted);
@@ -246,6 +247,25 @@ const ContractScanner = ({ onForceBuyRequest }) => {
           </div>
         </div>
 
+        {/* Live Trading Chart */}
+        <div className="scanner-chart-container glass-panel">
+          <div className="chart-header">
+            <h4>📈 Live Trading Chart</h4>
+            <span className="chart-subtitle">Powered by Dexscreener Live SDK</span>
+          </div>
+          <div className="chart-iframe-wrapper">
+            <iframe 
+              src={`https://dexscreener.com/solana/${tokenData.address}?embed=1&theme=dark&trades=0&info=0`}
+              title="Live Trading Chart"
+              width="100%"
+              height="450px"
+              frameBorder="0"
+              allow="clipboard-write"
+              allowFullScreen
+            ></iframe>
+          </div>
+        </div>
+
         {/* Safety report checklist */}
         <div className="scanner-checklist-layout">
           <div className="scanner-checklist-card glass-panel">
@@ -257,6 +277,35 @@ const ContractScanner = ({ onForceBuyRequest }) => {
                   <p>{check.text}</p>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="scanner-holders-card glass-panel">
+            <h4>👥 Top 5 Token Holders</h4>
+            <div className="holders-list">
+              {tokenData.holders && tokenData.holders.length > 0 ? (
+                tokenData.holders.map((holder, idx) => (
+                  <div key={idx} className="holder-row">
+                    <div className="holder-rank-address">
+                      <span className="holder-rank">#{idx + 1}</span>
+                      <code className="holder-address" title={holder.address}>
+                        {holder.address.substring(0, 6)}...{holder.address.substring(holder.address.length - 6)}
+                      </code>
+                      <button className="btn-copy-mini" onClick={() => handleCopy(holder.address)}>
+                        📋
+                      </button>
+                    </div>
+                    <div className="holder-amount-percent">
+                      <span className="holder-amount">
+                        {holder.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                      <span className="holder-percent">{holder.percentage.toFixed(2)}%</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="no-holders-text">No holder information retrieved.</p>
+              )}
             </div>
           </div>
 

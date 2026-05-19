@@ -6,7 +6,7 @@ import PumpFun from 'pumpfun-api';
 export const pumpFun = new PumpFun();
 
 const PUMP_FUN_PROGRAM_ID = new web3.PublicKey('6EF8rrecthR5Dkzon8Nwu78hRvfV9CUZTnzbA1g8Uu6A');
-const connection = new web3.Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+export const connection = new web3.Connection('https://api.mainnet-beta.solana.com', 'confirmed');
 
 // Helper to fetch live Dexscreener data
 async function fetchTokenMetadata(address) {

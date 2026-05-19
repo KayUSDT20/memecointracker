@@ -2300,7 +2300,7 @@ body {
 /* Checklist and Actions card styling */
 .scanner-checklist-layout {
   display: grid;
-  grid-template-columns: 1.3fr 1fr;
+  grid-template-columns: 1.2fr 1fr 1fr;
   gap: 25px;
 }
 
@@ -2438,4 +2438,131 @@ body {
   .scanner-checklist-layout {
     grid-template-columns: 1fr;
   }
+}
+
+/* Live Trading Chart & Top Holders Styling */
+.scanner-chart-container {
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 5px;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chart-header h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.chart-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.chart-iframe-wrapper {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+}
+
+.scanner-holders-card {
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+}
+
+.scanner-holders-card h4 {
+  margin: 0 0 15px 0;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.holders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.holder-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.holder-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(0, 255, 136, 0.15);
+}
+
+.holder-rank-address {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.holder-rank {
+  font-weight: 800;
+  color: var(--accent-color);
+  font-size: 0.8rem;
+}
+
+.holder-address {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.btn-copy-mini {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  font-size: 0.75rem;
+  transition: transform 0.1s ease;
+  opacity: 0.6;
+}
+
+.btn-copy-mini:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.holder-amount-percent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.holder-amount {
+  font-size: 0.8rem;
+  color: #fff;
+  font-weight: 700;
+}
+
+.holder-percent {
+  font-size: 0.7rem;
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+.no-holders-text {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 20px 0;
 }
