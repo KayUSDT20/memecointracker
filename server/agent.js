@@ -313,6 +313,32 @@ class AIAgent {
         }
     }
 
+    forceBuyRequest(data) {
+        let token = this.scannedTokens.find(t => t.address === data.address);
+        if (!token) {
+            token = {
+                address: data.address,
+                symbol: data.symbol,
+                name: data.name,
+                marketCap: data.marketCap || 0,
+                volume24h: data.volume24h || 0,
+                source: 'Manual Scanner Scan',
+                reason: `User scanned and force-requested buy for $${data.symbol}.`,
+                status: 'FLAGGED',
+                detectedAt: new Date().toISOString()
+            };
+            this.scannedTokens.unshift(token);
+        } else {
+            token.status = 'FLAGGED';
+            token.reason = `User scanned and force-requested buy for $${data.symbol}.`;
+            token.marketCap = data.marketCap || token.marketCap;
+            token.volume24h = data.volume24h || token.volume24h;
+        }
+
+        this.log(`User force-requested buy for scanned token ${token.symbol}.`, 'DECISION');
+        this.requestBuy(token);
+    }
+
     // Handles the $70k minimum marketcap buy rule
     checkBuyRule(token) {
         // Only buy if status is FLAGGED

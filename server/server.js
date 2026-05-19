@@ -43,6 +43,8 @@ wss.on('connection', (ws, req) => {
             if (parsed.type === 'MANUAL_TRADE') {
                 const { action, data } = parsed;
                 agent.handleManualTrade(action, data);
+            } else if (parsed.type === 'FORCE_BUY_REQUEST') {
+                agent.forceBuyRequest(parsed.data);
             }
         } catch (e) {
             console.error('Error processing websocket message from client', e);
@@ -69,6 +71,29 @@ startTwitterScraper(broadcast);
 startSolanaListener(broadcast);
 startWhaleWatcher(broadcast);
 startDexscreenerListener(broadcast);
+
+app.get('/api/scan-token/:address', async (req, res) => {
+    try {
+        const passcode = req.headers['x-creator-passcode'] || req.query.passcode;
+        const CREATOR_PASSCODE = process.env.CREATOR_PASSCODE || 'TheSunShine110123$$';
+
+        if (passcode !== CREATOR_PASSCODE) {
+            return res.status(401).json({ error: 'Unauthorized access' });
+        }
+
+        const { address } = req.params;
+        console.log(`Authenticated scan request for address: ${address}`);
+        const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${address}`);
+        if (!response.ok) {
+            return res.status(500).json({ error: 'Failed to fetch token data from Dexscreener' });
+        }
+        const data = await response.json();
+        res.json(data);
+    } catch (e) {
+        console.error('Error scanning token:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {

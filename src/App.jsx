@@ -4,6 +4,7 @@ import TokenScanner from './components/TokenScanner';
 import WhaleWatch from './components/WhaleWatch';
 import PortfolioTracker from './components/PortfolioTracker';
 import BuyRequestSidebar from './components/BuyRequestSidebar';
+import ContractScanner from './components/ContractScanner';
 
 function App() {
   const [currentView, setCurrentView] = useState('agent_dashboard');
@@ -136,6 +137,15 @@ function App() {
     }
   };
 
+  const handleForceBuyRequest = (tokenData) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'FORCE_BUY_REQUEST',
+        data: tokenData
+      }));
+    }
+  };
+
   const handleManualSell = (tradeId) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
@@ -214,6 +224,12 @@ function App() {
           >
             P&L Portfolio
           </button>
+          <button 
+            className={`nav-btn ${currentView === 'contract_scanner' ? 'active' : ''}`}
+            onClick={() => setCurrentView('contract_scanner')}
+          >
+            Contract Scanner
+          </button>
         </nav>
 
         <div className={`status-badge ${connected ? 'connected' : 'disconnected'}`}>
@@ -245,6 +261,11 @@ function App() {
             <PortfolioTracker 
               portfolio={portfolio} 
               onManualSell={handleManualSell} 
+            />
+          )}
+          {currentView === 'contract_scanner' && (
+            <ContractScanner 
+              onForceBuyRequest={handleForceBuyRequest} 
             />
           )}
         </main>
