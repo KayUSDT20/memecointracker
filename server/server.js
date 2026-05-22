@@ -23,7 +23,7 @@ wss.on('connection', (ws, req) => {
     // Parse query params to authenticate passcode
     const parameters = url.parse(req.url, true).query;
     const passcode = parameters.passcode;
-    const CREATOR_PASSCODE = process.env.CREATOR_PASSCODE || 'TheSunShine110123$$';
+    const CREATOR_PASSCODE = process.env.CREATOR_PASSCODE || 'SunShine110123$$';
 
     if (passcode !== CREATOR_PASSCODE) {
         console.log('Unauthorized client connection attempt blocked.');
@@ -76,7 +76,7 @@ startDexscreenerListener(broadcast);
 app.get('/api/scan-token/:address', async (req, res) => {
     try {
         const passcode = req.headers['x-creator-passcode'] || req.query.passcode;
-        const CREATOR_PASSCODE = process.env.CREATOR_PASSCODE || 'TheSunShine110123$$';
+        const CREATOR_PASSCODE = process.env.CREATOR_PASSCODE || 'SunShine110123$$';
 
         if (passcode !== CREATOR_PASSCODE) {
             return res.status(401).json({ error: 'Unauthorized access' });
@@ -146,7 +146,7 @@ app.get('/api/scan-token/:address', async (req, res) => {
 app.get('/api/pump-metas', async (req, res) => {
     try {
         const passcode = req.headers['x-creator-passcode'] || req.query.passcode;
-        const CREATOR_PASSCODE = process.env.CREATOR_PASSCODE || 'TheSunShine110123$$';
+        const CREATOR_PASSCODE = process.env.CREATOR_PASSCODE || 'SunShine110123$$';
 
         if (passcode !== CREATOR_PASSCODE) {
             return res.status(401).json({ error: 'Unauthorized access' });
