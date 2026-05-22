@@ -1,35 +1,93 @@
 import { targetAccounts } from './accounts.js';
 
-// Helper to fetch live Dexscreener data for Solana tokens
-async function fetchDexscreenerData(address) {
+// Helper to fetch live GeckoTerminal data for Solana tokens
+async function fetchGeckoTerminalData(address) {
     try {
-        const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${address}`);
+        const res = await fetch(`https://api.geckoterminal.com/api/v2/networks/solana/tokens/${address}`, {
+            headers: { 'Accept': 'application/json;version=20230203' }
+        });
         if (!res.ok) return null;
         const data = await res.json();
-        if (!data.pairs || data.pairs.length === 0) return null;
+        if (!data.data || !data.data.attributes) return null;
         
-        // Filter for Solana chain
-        const solanaPairs = data.pairs.filter(p => p.chainId === 'solana');
-        if (solanaPairs.length === 0) return null;
-        
-        // Use the highest liquidity pair
-        solanaPairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
-        const pair = solanaPairs[0];
-        
+        const attr = data.data.attributes;
+        const topPool = data.data.relationships?.top_pools?.data?.[0];
+        const poolAddress = topPool ? topPool.id.split('solana_')[1] : '';
+
+        let poolAttr = null;
+        if (poolAddress) {
+            try {
+                // Short wait to respect rate limit
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const poolRes = await fetch(`https://api.geckoterminal.com/api/v2/networks/solana/pools/${poolAddress}`, {
+                    headers: { 'Accept': 'application/json;version=20230203' }
+                });
+                if (poolRes.ok) {
+                    const poolData = await poolRes.json();
+                    if (poolData.data && poolData.data.attributes) {
+                        poolAttr = poolData.data.attributes;
+                    }
+                }
+            } catch (err) {
+                // Ignore pool fetch errors
+            }
+        }
+
+        const priceUsd = poolAttr ? parseFloat(poolAttr.base_token_price_usd) : parseFloat(attr.price_usd || 0);
+        const marketCap = parseFloat(attr.market_cap_usd || attr.fdv_usd || (poolAttr ? poolAttr.fdv_usd : 0));
+        const liquidity = poolAttr ? parseFloat(poolAttr.reserve_in_usd || 0) : parseFloat(attr.total_reserve_in_usd || 0);
+        const volume24h = poolAttr ? parseFloat(poolAttr.volume_usd?.h24 || 0) : parseFloat(attr.volume_usd?.h24 || 0);
+
         return {
-            address: pair.baseToken.address,
-            symbol: pair.baseToken.symbol,
-            name: pair.baseToken.name,
-            priceUsd: parseFloat(pair.priceUsd || 0),
-            marketCap: parseFloat(pair.marketCap || 0),
-            liquidity: parseFloat(pair.liquidity?.usd || 0),
-            volume24h: parseFloat(pair.volume?.h24 || 0),
-            dexId: pair.dexId,
-            url: pair.url
+            address: attr.address,
+            symbol: attr.symbol,
+            name: attr.name,
+            priceUsd: priceUsd,
+            marketCap: marketCap,
+            liquidity: liquidity,
+            volume24h: volume24h,
+            dexId: 'geckoterminal',
+            poolAddress: poolAddress,
+            url: `https://www.geckoterminal.com/solana/pools/${poolAddress || attr.address}`
         };
     } catch (e) {
         return null;
     }
+}
+
+// Helper to fetch live Dexscreener data for Solana tokens
+async function fetchDexscreenerData(address) {
+    try {
+        const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${address}`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.pairs && data.pairs.length > 0) {
+                // Filter for Solana chain
+                const solanaPairs = data.pairs.filter(p => p.chainId === 'solana');
+                if (solanaPairs.length > 0) {
+                    // Use the highest liquidity pair
+                    solanaPairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
+                    const pair = solanaPairs[0];
+                    return {
+                        address: pair.baseToken.address,
+                        symbol: pair.baseToken.symbol,
+                        name: pair.baseToken.name,
+                        priceUsd: parseFloat(pair.priceUsd || 0),
+                        marketCap: parseFloat(pair.marketCap || 0),
+                        liquidity: parseFloat(pair.liquidity?.usd || 0),
+                        volume24h: parseFloat(pair.volume?.h24 || 0),
+                        dexId: pair.dexId,
+                        url: pair.url
+                    };
+                }
+            }
+        }
+    } catch (e) {
+        // Fall through
+    }
+
+    // Fall back to GeckoTerminal
+    return await fetchGeckoTerminalData(address);
 }
 
 // Dictionary of relatable / common meme names and keywords

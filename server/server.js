@@ -84,11 +84,110 @@ app.get('/api/scan-token/:address', async (req, res) => {
 
         const { address } = req.params;
         console.log(`Authenticated scan request for address: ${address}`);
-        const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${address}`);
-        if (!response.ok) {
-            return res.status(500).json({ error: 'Failed to fetch token data from Dexscreener' });
+        
+        let data;
+        try {
+            const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${address}`);
+            if (response.ok) {
+                data = await response.json();
+            }
+        } catch (err) {
+            console.warn("Dexscreener scan fetch error:", err.message);
         }
-        const data = await response.json();
+
+        // If Dexscreener fails or returns empty pairs, fallback to GeckoTerminal
+        if (!data || !data.pairs || data.pairs.length === 0) {
+            try {
+                console.log(`Token not found on Dexscreener. Retrying scan on GeckoTerminal: ${address}`);
+                const response = await fetch(`https://api.geckoterminal.com/api/v2/networks/solana/tokens/${address}`, {
+                    headers: { 'Accept': 'application/json;version=20230203' }
+                });
+                if (response.ok) {
+                    const geckoData = await response.json();
+                    if (geckoData.data && geckoData.data.attributes) {
+                        const attr = geckoData.data.attributes;
+                        const topPool = geckoData.data.relationships?.top_pools?.data?.[0];
+                        const poolAddress = topPool ? topPool.id.split('solana_')[1] : '';
+
+                        let poolAttr = null;
+                        if (poolAddress) {
+                            try {
+                                // Small delay to avoid rate limit
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                const poolResponse = await fetch(`https://api.geckoterminal.com/api/v2/networks/solana/pools/${poolAddress}`, {
+                                    headers: { 'Accept': 'application/json;version=20230203' }
+                                });
+                                if (poolResponse.ok) {
+                                    const poolData = await poolResponse.json();
+                                    if (poolData.data && poolData.data.attributes) {
+                                        poolAttr = poolData.data.attributes;
+                                    }
+                                }
+                            } catch (poolErr) {
+                                console.warn("Failed to fetch GeckoTerminal pool details:", poolErr.message);
+                            }
+                        }
+
+                        const priceUsd = poolAttr ? parseFloat(poolAttr.base_token_price_usd) : parseFloat(attr.price_usd || 0);
+                        const marketCap = parseFloat(attr.market_cap_usd || attr.fdv_usd || (poolAttr ? poolAttr.fdv_usd : 0));
+                        const liquidity = poolAttr ? parseFloat(poolAttr.reserve_in_usd || 0) : parseFloat(attr.total_reserve_in_usd || 0);
+                        const volume24h = poolAttr ? parseFloat(poolAttr.volume_usd?.h24 || 0) : parseFloat(attr.volume_usd?.h24 || 0);
+                        const volume6h = poolAttr ? parseFloat(poolAttr.volume_usd?.h6 || 0) : (volume24h * 0.25);
+                        
+                        const priceChange5m = poolAttr ? parseFloat(poolAttr.price_change_percentage?.m5 || 0) : 0;
+                        const priceChange1h = poolAttr ? parseFloat(poolAttr.price_change_percentage?.h1 || 0) : 0;
+                        const priceChange6h = poolAttr ? parseFloat(poolAttr.price_change_percentage?.h6 || 0) : 0;
+                        const priceChange24h = poolAttr ? parseFloat(poolAttr.price_change_percentage?.h24 || 0) : 0;
+
+                        const buys24h = poolAttr ? parseInt(poolAttr.transactions?.h24?.buys || 0) : 0;
+                        const sells24h = poolAttr ? parseInt(poolAttr.transactions?.h24?.sells || 0) : 0;
+
+                        const priceNative = poolAttr ? parseFloat(poolAttr.base_token_price_native_currency || 0) : 0;
+
+                        data = {
+                            pairs: [{
+                                chainId: 'solana',
+                                dexId: 'geckoterminal',
+                                url: `https://www.geckoterminal.com/solana/pools/${poolAddress || attr.address}`,
+                                poolAddress: poolAddress,
+                                pairAddress: poolAddress || attr.address,
+                                baseToken: {
+                                    address: attr.address,
+                                    name: attr.name,
+                                    symbol: attr.symbol
+                                },
+                                priceUsd: priceUsd,
+                                priceNative: priceNative,
+                                volume: {
+                                    h24: volume24h,
+                                    h6: volume6h
+                                },
+                                marketCap: marketCap,
+                                liquidity: {
+                                    usd: liquidity
+                                },
+                                priceChange: {
+                                    m5: priceChange5m,
+                                    h1: priceChange1h,
+                                    h6: priceChange6h,
+                                    h24: priceChange24h
+                                },
+                                txns: {
+                                    h24: { buys: buys24h, sells: sells24h }
+                                },
+                                info: {
+                                    imageUrl: attr.image_url,
+                                    websites: [],
+                                    socials: []
+                                }
+                            }]
+                        };
+                    }
+                }
+            } catch (err) {
+                console.error("GeckoTerminal fetch fallback error:", err.message);
+            }
+        }
 
         // Query top 5 holders from Solana mainnet Connection
         let holders = [];

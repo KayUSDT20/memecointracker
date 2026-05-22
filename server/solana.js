@@ -8,25 +8,73 @@ export const pumpFun = new PumpFun();
 const PUMP_FUN_PROGRAM_ID = new web3.PublicKey('6EF8rrecthR5Dkzon8Nwu78hRvfV9CUZTnzbA1g8Uu6A');
 export const connection = new web3.Connection('https://api.mainnet-beta.solana.com', 'confirmed');
 
-// Helper to fetch live Dexscreener data
+// Helper to fetch live Dexscreener data with GeckoTerminal fallback
 async function fetchTokenMetadata(address) {
     try {
         const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${address}`);
-        if (!res.ok) return null;
-        const data = await res.json();
-        if (!data.pairs || data.pairs.length === 0) return null;
-        
-        const pair = data.pairs.find(p => p.chainId === 'solana') || data.pairs[0];
-        return {
-            symbol: pair.baseToken.symbol,
-            name: pair.baseToken.name,
-            marketCap: parseFloat(pair.marketCap || 0),
-            priceUsd: parseFloat(pair.priceUsd || 0),
-            liquidity: `$${parseFloat(pair.liquidity?.usd || 0).toLocaleString()}`
-        };
+        if (res.ok) {
+            const data = await res.json();
+            if (data.pairs && data.pairs.length > 0) {
+                const pair = data.pairs.find(p => p.chainId === 'solana') || data.pairs[0];
+                return {
+                    symbol: pair.baseToken.symbol,
+                    name: pair.baseToken.name,
+                    marketCap: parseFloat(pair.marketCap || 0),
+                    priceUsd: parseFloat(pair.priceUsd || 0),
+                    liquidity: `$${parseFloat(pair.liquidity?.usd || 0).toLocaleString()}`
+                };
+            }
+        }
     } catch (e) {
-        return null;
+        // Fall through
     }
+
+    try {
+        const res = await fetch(`https://api.geckoterminal.com/api/v2/networks/solana/tokens/${address}`, {
+            headers: { 'Accept': 'application/json;version=20230203' }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.data && data.data.attributes) {
+                const attr = data.data.attributes;
+                const topPool = data.data.relationships?.top_pools?.data?.[0];
+                const poolAddress = topPool ? topPool.id.split('solana_')[1] : '';
+
+                let poolAttr = null;
+                if (poolAddress) {
+                    try {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        const poolRes = await fetch(`https://api.geckoterminal.com/api/v2/networks/solana/pools/${poolAddress}`, {
+                            headers: { 'Accept': 'application/json;version=20230203' }
+                        });
+                        if (poolRes.ok) {
+                            const poolData = await poolRes.json();
+                            if (poolData.data && poolData.data.attributes) {
+                                poolAttr = poolData.data.attributes;
+                            }
+                        }
+                    } catch (err) {
+                        // ignore pool fetch error
+                    }
+                }
+
+                const priceUsd = poolAttr ? parseFloat(poolAttr.base_token_price_usd) : parseFloat(attr.price_usd || 0);
+                const marketCap = parseFloat(attr.market_cap_usd || attr.fdv_usd || (poolAttr ? poolAttr.fdv_usd : 0));
+                const liquidity = poolAttr ? parseFloat(poolAttr.reserve_in_usd || 0) : parseFloat(attr.total_reserve_in_usd || 0);
+
+                return {
+                    symbol: attr.symbol,
+                    name: attr.name,
+                    marketCap: marketCap,
+                    priceUsd: priceUsd,
+                    liquidity: `$${liquidity.toLocaleString()}`
+                };
+            }
+        }
+    } catch (e) {
+        // Fall through
+    }
+    return null;
 }
 
 export async function startSolanaListener(broadcast) {

@@ -51,6 +51,7 @@ const ContractScanner = ({ onForceBuyRequest }) => {
         symbol: bestPair.baseToken.symbol,
         dexId: bestPair.dexId,
         url: bestPair.url,
+        poolAddress: bestPair.poolAddress, // Pass pool address for GeckoTerminal embeds
         priceUsd: parseFloat(bestPair.priceUsd || 0),
         priceNative: parseFloat(bestPair.priceNative || 0),
         volume24h: bestPair.volume?.h24 || 0,
@@ -251,11 +252,16 @@ const ContractScanner = ({ onForceBuyRequest }) => {
         <div className="scanner-chart-container glass-panel">
           <div className="chart-header">
             <h4>📈 Live Trading Chart</h4>
-            <span className="chart-subtitle">Powered by Dexscreener Live SDK</span>
+            <span className="chart-subtitle">
+              Powered by {tokenData.dexId === 'geckoterminal' ? 'GeckoTerminal Embed' : 'Dexscreener Live SDK'}
+            </span>
           </div>
           <div className="chart-iframe-wrapper">
             <iframe 
-              src={`https://dexscreener.com/solana/${tokenData.address}?embed=1&theme=dark&trades=0&info=0`}
+              src={tokenData.dexId === 'geckoterminal' 
+                ? `https://www.geckoterminal.com/solana/pools/${tokenData.poolAddress || tokenData.address}?embed=1&info=0&swaps=0&light_chart=0&bg_color=111827`
+                : `https://dexscreener.com/solana/${tokenData.address}?embed=1&theme=dark&trades=0&info=0`
+              }
               title="Live Trading Chart"
               width="100%"
               height="450px"
@@ -329,7 +335,7 @@ const ContractScanner = ({ onForceBuyRequest }) => {
             </button>
             {tokenData.url && (
               <a href={tokenData.url} target="_blank" rel="noopener noreferrer" className="btn-view-dex">
-                📈 View Pair on Dexscreener
+                📈 View Pair on {tokenData.dexId === 'geckoterminal' ? 'GeckoTerminal' : 'Dexscreener'}
               </a>
             )}
           </div>
@@ -369,7 +375,7 @@ const ContractScanner = ({ onForceBuyRequest }) => {
         <div className="scanner-loading-radar glass-panel">
           <div className="radar-ping-ring"></div>
           <div className="radar-sweep-hand"></div>
-          <p>Decrypting contract bytecode & querying Dexscreener pools...</p>
+          <p>Decrypting contract bytecode & querying live DEX pools...</p>
         </div>
       )}
 
