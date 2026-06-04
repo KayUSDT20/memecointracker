@@ -3,12 +3,32 @@ import http from 'http';
 import { WebSocketServer } from 'ws';
 import cors from 'cors';
 import url from 'url';
+import os from 'os';
 import { startTwitterScraper } from './twitter.js';
 import { startSolanaListener, pumpFun, connection } from './solana.js';
 import web3 from '@solana/web3.js';
 import { agent } from './agent.js';
 import { startWhaleWatcher } from './whale.js';
 import { startDexscreenerListener } from './dex.js';
+
+function isMacWhitelisted() {
+    try {
+        const interfaces = os.networkInterfaces();
+        for (const name of Object.keys(interfaces)) {
+            for (const net of interfaces[name]) {
+                if (net.mac) {
+                    const formatted = net.mac.toUpperCase().replace(/:/g, '-');
+                    if (formatted === 'E4-B9-7A-4C-BA-6C') {
+                        return true;
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Error checking network interfaces for MAC:", e.message);
+    }
+    return false;
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -20,7 +40,19 @@ app.use(express.json());
 let clients = [];
 
 wss.on('connection', (ws, req) => {
-    console.log('Client connected successfully');
+    // Parse query params to authenticate passcode/password
+    const parameters = url.parse(req.url, true).query;
+    const password = parameters.password || parameters.passcode;
+    const bypass = isMacWhitelisted();
+
+    if (!bypass && password !== 'SunShine110123$$') {
+        console.log('Unauthorized client connection attempt blocked.');
+        ws.send(JSON.stringify({ type: 'AUTH_FAILED', message: 'Invalid creator passcode' }));
+        ws.close();
+        return;
+    }
+
+    console.log('Client connected successfully' + (bypass ? ' (Bypassed via MAC whitelist)' : ''));
     clients.push(ws);
 
     // Send initial log, portfolio and scanned token state
@@ -61,8 +93,19 @@ startSolanaListener(broadcast);
 startWhaleWatcher(broadcast);
 startDexscreenerListener(broadcast);
 
+app.get('/api/auth-status', (req, res) => {
+    res.json({ bypass: isMacWhitelisted() });
+});
+
 app.get('/api/scan-token/:address', async (req, res) => {
     try {
+        const password = req.headers['x-creator-password'] || req.query.password || req.headers['x-creator-passcode'] || req.query.passcode;
+        const bypass = isMacWhitelisted();
+
+        if (!bypass && password !== 'SunShine110123$$') {
+            return res.status(401).json({ error: 'Unauthorized access' });
+        }
+
         const { address } = req.params;
         console.log(`Authenticated scan request for address: ${address}`);
         
@@ -225,6 +268,13 @@ app.get('/api/scan-token/:address', async (req, res) => {
 
 app.get('/api/pump-metas', async (req, res) => {
     try {
+        const password = req.headers['x-creator-password'] || req.query.password || req.headers['x-creator-passcode'] || req.query.passcode;
+        const bypass = isMacWhitelisted();
+
+        if (!bypass && password !== 'SunShine110123$$') {
+            return res.status(401).json({ error: 'Unauthorized access' });
+        }
+
         console.log(`Request to fetch pump.fun metas`);
         try {
             const coinMetas = await pumpFun.metas.getCurrentMetas();

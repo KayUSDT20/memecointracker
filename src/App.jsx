@@ -21,26 +21,71 @@ function App() {
   const [latestWhaleTx, setLatestWhaleTx] = useState(null);
   const [connected, setConnected] = useState(false);
 
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState(localStorage.getItem('creator_password') || '');
+  const [authError, setAuthError] = useState('');
+  const [bypassActive, setBypassActive] = useState(false);
+
   const wsRef = useRef(null);
 
   useEffect(() => {
-    connectWS();
+    // Check if device is whitelisted for bypass
+    fetch('http://localhost:3001/api/auth-status')
+      .then(res => res.json())
+      .then(data => {
+        if (data.bypass) {
+          setBypassActive(true);
+          setIsAuthenticated(true);
+          connectWS(true);
+        } else {
+          const savedPass = localStorage.getItem('creator_password');
+          if (savedPass) {
+            connectWS(false, savedPass);
+          }
+        }
+      })
+      .catch(err => {
+        console.warn("Could not check auth status:", err.message);
+        const savedPass = localStorage.getItem('creator_password');
+        if (savedPass) {
+          connectWS(false, savedPass);
+        }
+      });
+
     return () => {
       if (wsRef.current) wsRef.current.close();
     };
   }, []);
 
-  const connectWS = () => {
-    const ws = new WebSocket(`ws://localhost:3001`);
+  const connectWS = (bypass, passwordToUse) => {
+    const activePass = passwordToUse || password;
+    const url = bypass 
+      ? `ws://localhost:3001`
+      : `ws://localhost:3001?password=${encodeURIComponent(activePass)}`;
+
+    const ws = new WebSocket(url);
 
     ws.onopen = () => {
       console.log('Connected to Antigravity Live Broker');
       setConnected(true);
+      setIsAuthenticated(true);
+      setAuthError('');
+      if (!bypass && activePass) {
+        localStorage.setItem('creator_password', activePass);
+      }
     };
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
+        
+        if (message.type === 'AUTH_FAILED') {
+          setAuthError(message.message);
+          setIsAuthenticated(false);
+          localStorage.removeItem('creator_password');
+          return;
+        }
+
         switch (message.type) {
           case 'INITIAL_STATE':
             setScannedTokens(message.data.scannedTokens || []);
@@ -78,10 +123,22 @@ function App() {
       console.log('WebSocket closed.');
       setConnected(false);
       // Auto-reconnect
-      setTimeout(() => connectWS(), 3000);
+      setTimeout(() => {
+        const savedPass = localStorage.getItem('creator_password');
+        connectWS(bypass, savedPass);
+      }, 3000);
     };
 
     wsRef.current = ws;
+  };
+
+  const handleAuthSubmit = (e) => {
+    e.preventDefault();
+    if (password.trim() === '') {
+      setAuthError('Password cannot be empty');
+      return;
+    }
+    connectWS(false, password);
   };
 
   const handleManualBuy = (tokenAddress) => {
@@ -122,6 +179,41 @@ function App() {
       }));
     }
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="auth-overlay-container">
+        <div className="auth-card glass-panel">
+          <div className="auth-logo-icon">🛰️</div>
+          <h2>Creator Portal</h2>
+          <p>Access is restricted. Please enter the creator passcode to decrypt the console.</p>
+          
+          <form onSubmit={handleAuthSubmit} className="auth-form">
+            <div className="auth-input-group">
+              <input 
+                type="password" 
+                placeholder="Enter Password..." 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)}
+                className="auth-input"
+              />
+              <span className="auth-input-lock">🔒</span>
+            </div>
+            
+            {authError && (
+              <div className="auth-error-message">
+                ❌ {authError}
+              </div>
+            )}
+            
+            <button type="submit" className="auth-submit-btn">
+              Authenticate Creator
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
