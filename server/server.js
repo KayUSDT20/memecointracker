@@ -20,19 +20,7 @@ app.use(express.json());
 let clients = [];
 
 wss.on('connection', (ws, req) => {
-    // Parse query params to authenticate passcode
-    const parameters = url.parse(req.url, true).query;
-    const passcode = parameters.passcode;
-    const CREATOR_PASSCODE = process.env.CREATOR_PASSCODE || 'SunShine110123$$';
-
-    if (passcode !== CREATOR_PASSCODE) {
-        console.log('Unauthorized client connection attempt blocked.');
-        ws.send(JSON.stringify({ type: 'AUTH_FAILED', message: 'Invalid creator passcode' }));
-        ws.close();
-        return;
-    }
-
-    console.log('Client connected and authenticated successfully');
+    console.log('Client connected successfully');
     clients.push(ws);
 
     // Send initial log, portfolio and scanned token state
@@ -75,13 +63,6 @@ startDexscreenerListener(broadcast);
 
 app.get('/api/scan-token/:address', async (req, res) => {
     try {
-        const passcode = req.headers['x-creator-passcode'] || req.query.passcode;
-        const CREATOR_PASSCODE = process.env.CREATOR_PASSCODE || 'SunShine110123$$';
-
-        if (passcode !== CREATOR_PASSCODE) {
-            return res.status(401).json({ error: 'Unauthorized access' });
-        }
-
         const { address } = req.params;
         console.log(`Authenticated scan request for address: ${address}`);
         
@@ -244,14 +225,7 @@ app.get('/api/scan-token/:address', async (req, res) => {
 
 app.get('/api/pump-metas', async (req, res) => {
     try {
-        const passcode = req.headers['x-creator-passcode'] || req.query.passcode;
-        const CREATOR_PASSCODE = process.env.CREATOR_PASSCODE || 'SunShine110123$$';
-
-        if (passcode !== CREATOR_PASSCODE) {
-            return res.status(401).json({ error: 'Unauthorized access' });
-        }
-
-        console.log(`Authenticated request to fetch pump.fun metas`);
+        console.log(`Request to fetch pump.fun metas`);
         try {
             const coinMetas = await pumpFun.metas.getCurrentMetas();
             res.json(coinMetas);

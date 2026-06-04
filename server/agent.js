@@ -163,7 +163,7 @@ class AIAgent {
         this.log(`Detected new token: ${token.symbol} (${token.name}) on Solana.`, 'SCANNER');
 
         // Check if there is an X.com tweet matching or if we scan its details
-        const tweetContext = this.findMatchingTweetForToken(token);
+        const tweetContext = token.tweetContext || this.findMatchingTweetForToken(token);
         
         // Analyze relatability of the name
         const { score, reason } = this.analyzeNameRelatability(token.name, token.symbol);
@@ -191,6 +191,7 @@ class AIAgent {
             relatabilityScore: score,
             reason: reason,
             tweetContext: tweetContext || null,
+            mentions: tweetContext ? [tweetContext.username] : [],
             status: status
         };
 
@@ -248,6 +249,14 @@ class AIAgent {
                     text: tweet.text,
                     timestamp: tweet.timestamp
                 };
+                if (!existingToken.mentions) {
+                    existingToken.mentions = [];
+                }
+                if (!existingToken.mentions.includes(tweet.username)) {
+                    if (existingToken.mentions.length < 5) {
+                        existingToken.mentions.push(tweet.username);
+                    }
+                }
                 if (existingToken.status === 'IGNORED' || existingToken.status === 'SCANNING') {
                     existingToken.status = 'FLAGGED';
                     this.log(`Token ${existingToken.symbol} has been upgraded to FLAGGED because top influencer @${tweet.username} mentioned it.`, 'DECISION');
@@ -256,8 +265,44 @@ class AIAgent {
                 this.broadcastScannedTokens();
             }
         } else {
-            // If tweet has no CA, check if it mentions a name that we can correlate to a future token launch
-            this.log(`Scanned tweet from @${tweet.username}: "${tweet.text.substring(0, 45)}...". Checking for memecoin name cues.`, 'X_SCAN');
+            // If tweet has no CA, check if it mentions any already tracked token by symbol or name
+            const lowercaseText = tweet.text.toLowerCase();
+            let matchedAny = false;
+
+            for (const token of this.scannedTokens) {
+                const symbolClean = token.symbol.replace('$', '').toLowerCase();
+                const nameClean = token.name.toLowerCase();
+
+                // Match $symbol, symbol (as word), or the token name
+                const symbolRegex = new RegExp(`\\$?\\b${symbolClean}\\b`, 'i');
+                const nameRegex = new RegExp(`\\b${nameClean}\\b`, 'i');
+
+                if (symbolRegex.test(lowercaseText) || nameRegex.test(lowercaseText)) {
+                    if (!token.mentions) {
+                        token.mentions = [];
+                    }
+                    if (!token.mentions.includes(tweet.username)) {
+                        if (token.mentions.length < 5) {
+                            token.mentions.push(tweet.username);
+                        }
+                    }
+                    // Update tweetContext with the latest correlation
+                    token.tweetContext = {
+                        username: tweet.username,
+                        text: tweet.text,
+                        timestamp: tweet.timestamp
+                    };
+                    matchedAny = true;
+                    this.log(`Correlated mention from @${tweet.username} to tracked token ${token.symbol}`, 'X_SCAN');
+                }
+            }
+
+            if (matchedAny) {
+                this.broadcastScannedTokens();
+            } else {
+                // If tweet has no CA and no match, check for name cues
+                this.log(`Scanned tweet from @${tweet.username}: "${tweet.text.substring(0, 45)}...". Checking for memecoin name cues.`, 'X_SCAN');
+            }
         }
     }
 

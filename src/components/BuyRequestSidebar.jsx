@@ -48,6 +48,17 @@ const BuyRequestSidebar = ({ tokens, onApproveBuy, onCancelBuy }) => {
                   {token.reason.substring(0, 75)}{token.reason.length > 75 ? '...' : ''}
                 </p>
 
+                {token.mentions && token.mentions.length > 0 && (
+                  <div className="sidebar-mentions" style={{ marginTop: '6px', fontSize: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                    <span style={{ color: '#94a3b8' }}>📢:</span>
+                    {token.mentions.map((user) => (
+                      <span key={user} style={{ color: '#38bdf8', background: 'rgba(56, 189, 248, 0.05)', padding: '1px 4px', borderRadius: '3px' }}>
+                        @{user}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 <div className="sidebar-action-buttons">
                   <button 
                     className="btn-approve-buy" 

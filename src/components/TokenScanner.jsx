@@ -114,6 +114,21 @@ const TokenScanner = ({ tokens, onManualBuy }) => {
                       <div className="tweet-text-content">"{token.tweetContext.text}"</div>
                     </div>
                   )}
+
+                  {token.mentions && token.mentions.length > 0 && (
+                    <div className="token-mentions-box" style={{ marginTop: '8px', padding: '6px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div className="mentions-header" style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span>📢 Top X Mentions ({token.mentions.length}/5):</span>
+                      </div>
+                      <div className="mentions-list" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {token.mentions.map((user) => (
+                          <span key={user} className="mention-badge" style={{ fontSize: '0.75rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(56, 189, 248, 0.2)', fontWeight: '500' }}>
+                            @{user}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions */}

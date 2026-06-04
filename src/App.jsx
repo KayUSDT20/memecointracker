@@ -21,48 +21,26 @@ function App() {
   const [latestWhaleTx, setLatestWhaleTx] = useState(null);
   const [connected, setConnected] = useState(false);
 
-  // Security State
-  const [passcode, setPasscode] = useState(localStorage.getItem('creator_passcode') || '');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authError, setAuthError] = useState('');
-  
   const wsRef = useRef(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('creator_passcode');
-    if (saved) {
-      connectWS(saved);
-    }
+    connectWS();
     return () => {
       if (wsRef.current) wsRef.current.close();
     };
   }, []);
 
-  const connectWS = (codeToUse) => {
-    const activeCode = codeToUse || passcode;
-    if (!activeCode) return;
-
-    const ws = new WebSocket(`ws://localhost:3001?passcode=${encodeURIComponent(activeCode)}`);
+  const connectWS = () => {
+    const ws = new WebSocket(`ws://localhost:3001`);
 
     ws.onopen = () => {
       console.log('Connected to Antigravity Live Broker');
       setConnected(true);
-      setIsAuthenticated(true);
-      setAuthError('');
-      localStorage.setItem('creator_passcode', activeCode);
     };
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        
-        if (message.type === 'AUTH_FAILED') {
-          setAuthError(message.message);
-          setIsAuthenticated(false);
-          localStorage.removeItem('creator_passcode');
-          return;
-        }
-
         switch (message.type) {
           case 'INITIAL_STATE':
             setScannedTokens(message.data.scannedTokens || []);
@@ -99,22 +77,11 @@ function App() {
     ws.onclose = () => {
       console.log('WebSocket closed.');
       setConnected(false);
-      // Auto-reconnect if authenticated
-      if (localStorage.getItem('creator_passcode')) {
-        setTimeout(() => connectWS(localStorage.getItem('creator_passcode')), 3000);
-      }
+      // Auto-reconnect
+      setTimeout(() => connectWS(), 3000);
     };
 
     wsRef.current = ws;
-  };
-
-  const handleAuthSubmit = (e) => {
-    e.preventDefault();
-    if (passcode.trim() === '') {
-      setAuthError('Passcode cannot be empty');
-      return;
-    }
-    connectWS(passcode);
   };
 
   const handleManualBuy = (tokenAddress) => {
@@ -155,41 +122,6 @@ function App() {
       }));
     }
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="auth-overlay-container">
-        <div className="auth-card glass-panel">
-          <div className="auth-logo-icon">🛰️</div>
-          <h2>Creator Portal</h2>
-          <p>Access is restricted. Please enter the creator passcode to decrypt the console.</p>
-          
-          <form onSubmit={handleAuthSubmit} className="auth-form">
-            <div className="auth-input-group">
-              <input 
-                type="password" 
-                placeholder="Enter Passcode..." 
-                value={passcode} 
-                onChange={(e) => setPasscode(e.target.value)}
-                className="auth-input"
-              />
-              <span className="auth-input-lock">🔒</span>
-            </div>
-            
-            {authError && (
-              <div className="auth-error-message">
-                ❌ {authError}
-              </div>
-            )}
-            
-            <button type="submit" className="auth-submit-btn">
-              Authenticate Creator
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>
