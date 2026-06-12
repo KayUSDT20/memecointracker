@@ -18,8 +18,7 @@ const ContractScanner = ({ onForceBuyRequest }) => {
     setTokenData(null);
 
     try {
-      const passcode = localStorage.getItem('creator_passcode') || '';
-      const response = await fetch(`http://localhost:3001/api/scan-token/${address.trim()}?passcode=${encodeURIComponent(passcode)}`);
+      const response = await fetch(`http://localhost:3001/api/scan-token/${address.trim()}`);
       
       if (!response.ok) {
         if (response.status === 401) {
